@@ -5,24 +5,34 @@ from time import time
 from glob import glob
 
 class Neural_Network(nn.Module):
-    '''Base layer for all neural network models'''
+    """Base layer for all neural network models"""
     __metaclass__ = ABCMeta
 
     @abstractmethod
-    def __init__(self, name, type, params):
-        '''Initialize an Agent object given a dictionary of parameters.
+    def __init__(self, name, type_, params):
+        """Initialize an Neural Network model given a dictionary of parameters.
         
         Params
         ======
         * **name** (string) --- name of the model
-        * **type** (string) --- type of the model
+        * **type_** (string) --- type of the model
         * **params** (dict-like) --- a dictionary of parameters
-        '''
+        """
         pass
+
+    
+    def get_device(self):
+        """Checks if GPU is available else runs on CPU"""
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        print('\nAI Running on {}\n'.format(device))
+        if str(device) == 'cuda':
+            torch.backends.cudnn.benchmark = True
+            torch.backends.cudnn.enabled = True
+        return device
 
 
     def load_model(self, file_name):
-        '''Loads the models parameters and weights'''
+        """Loads the models parameters and weights"""
         
         path = f'outputs\\checkpoints\\{self.type}\\{self.name}'
 
@@ -39,7 +49,7 @@ class Neural_Network(nn.Module):
 
 
     def save_model(self):
-        '''Loads the models parameters and weights'''
+        """Loads the models parameters and weights"""
         
         checkpoint = {
             'params' : self.params,
