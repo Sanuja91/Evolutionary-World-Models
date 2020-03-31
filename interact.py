@@ -3,8 +3,6 @@ import cv2
 import numpy as np
 from pyglet.window import key
 
-from models.vae import ConvVAE
-
 def create_images(frames):
     """Creates training images for VAE"""
     env = gym.make('CarRacing-v0')
@@ -29,7 +27,9 @@ def create_images(frames):
         env.render()
         env.viewer.window.on_key_press = key_press
         env.viewer.window.on_key_release = key_release
-        cv2.imwrite(f'images/{count}.png', obs)
+        cv2.imwrite(f'images/images/{count}.png', obs)
         obs, reward, done, info = env.step(a)
         count += 1
     env.close()
+
+create_images(100)

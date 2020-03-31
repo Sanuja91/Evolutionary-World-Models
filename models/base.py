@@ -11,14 +11,14 @@ class Neural_Network(nn.Module):
     @abstractmethod
     def __init__(self, name, type_, params):
         """Initialize an Neural Network model given a dictionary of parameters.
-        
+
         Params
         ======
         * **name** (string) --- name of the model
         * **type_** (string) --- type of the model
         * **params** (dict-like) --- a dictionary of parameters
         """
-        pass
+        super(Neural_Network, self).__init__()
 
     
     def get_device(self):
@@ -34,14 +34,14 @@ class Neural_Network(nn.Module):
     def load_model(self, file_name):
         """Loads the models parameters and weights"""
         
-        path = f'outputs\\checkpoints\\{self.type}\\{self.name}'
+        path = f'checkpoints\\{self.type}\\{self.name}'
 
         if file_name is None:
             list_of_files = glob(path) 
             latest_file = max(list_of_files, key = os.path.getctime)
             _, file_name = os.path.split(latest_file)
         
-        path = f'outputs\\checkpoints\\{self.type}\\{self.name}\\{file_name}'
+        path = f'checkpoints\\{self.type}\\{self.name}\\{file_name}'
             
         checkpoint = torch.load(path, map_location = lambda storage, loc: storage)
         self.params = checkpoint['params']
@@ -56,11 +56,11 @@ class Neural_Network(nn.Module):
             'weights' : self.state_dict()
         }
         
-        path = f'outputs\\checkpoints\\{self.type}\\{self.name}'
+        path = f'checkpoints\\{self.type}\\{self.name}'
         if not os.path.exists(path):
             os.makedirs(path)
         
-        path += f'\\{str(time)}'
+        path += f'\\{str(time())}.pth'
         torch.save(checkpoint, path)
 
 
