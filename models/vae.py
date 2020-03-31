@@ -5,9 +5,7 @@ from torch.nn import functional as F
 from torchvision import datasets, transforms
 from torch.distributions.distribution import Distribution
 import matplotlib.pyplot as plt
-from base import Neural_Network
-
-
+from models.base import Neural_Network
 
 class Conv(nn.Module):
     """Simlifed NN for ease of code"""
@@ -69,26 +67,28 @@ class Conv(nn.Module):
 class ConvVAE(Neural_Network):
     """Convolutional Variational Auto Encoder"""
 
-    def __init__(self, name, type_, params):
+    def __init__(self, name, params, load_model = False):
         """Initialize an Neural Network model given a dictionary of parameters.
 
         Params
         =====
         * **name** (string) --- name of the model
-        * **type** (string) --- type of the model
         * **params** (dict-like) --- a dictionary of parameters
         """
         
-        super(ConvVAE, self).__init__(name, type_, params)
+        super(ConvVAE, self).__init__(name, params, load_model)
         self.name = name
-        self.type = type_
-        self.z_size = params['z_size']
-        self.batch_size = params['batch_size']
-        self.learning_rate = params['learning_rate']
-        self.kl_tolerance = params['kl_tolerance']
-        self.batch_norm = params['batch_norm']
+        self.type = 'Conv VAE'
+        if load_model != False:
+            self.load_model(load_model)
+        else:
+            self.params = params
+        self.z_size = self.params['z_size']
+        self.batch_size = self.params['batch_size']
+        self.learning_rate = self.params['learning_rate']
+        self.kl_tolerance = self.params['kl_tolerance']
+        self.batch_norm = self.params['batch_norm']
         self.device = self.get_device()
-        self.params = params
         
         # The Encoder
         self.encoder = nn.Sequential(
@@ -113,6 +113,9 @@ class ConvVAE(Neural_Network):
         )
 
         self.dec_conv = Conv(1024, 512, 1, 2, 0, conv = nn.Conv1d, activation = nn.ReLU, batch_norm = self.batch_norm)
+        
+        if load_model != False:
+            self.load_state_dict(self.weights)
 
     def forward(self, x):
         # print('INPUT', x.shape)
@@ -128,11 +131,8 @@ class ConvVAE(Neural_Network):
         """Encodes observation"""
         x = self.encoder(x)
         # print('ENCODER', x.shape)
-        # x = x.reshape((-1, 2 * 2 * 256))
         x.squeeze_(-1)
         # print('ENCODER RESHAPE', x.shape)
-        # return self.enc_fc_mu(x), self.enc_fc_logvar(x)
-        
         mu = self.enc_conv_mu(x)
         logvar = self.enc_conv_logvar(x)
         return mu, logvar
@@ -147,13 +147,13 @@ class ConvVAE(Neural_Network):
         """Decodes the encoding"""
         x = self.dec_conv(z)
         # print('DEC CONV', x.shape)
-        # x = x.reshape((-1, 1, 1, 2 * 2 * 256))
         x.unsqueeze_(-1)
         # print('DECODER RESHAPE', x.shape)
         return self.decoder(x)
 
-# Reconstruction + KL divergence losses summed over all elements and batch
+
 def loss_function(outputs, inputs, mu, logvar):
+    """Reconstruction + KL divergence losses summed over all elements and batch"""
     BCE = F.binary_cross_entropy(outputs, inputs.view(-1, 2 * 2 * 256), reduction = 'sum')
 
     # see Appendix B from VAE paper:
@@ -163,7 +163,7 @@ def loss_function(outputs, inputs, mu, logvar):
     KLD = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
     return BCE + KLD
 
-def train(model, epochs, log_interval):
+def train_vae(model, epochs, log_interval):
     """Trains the Conv VAE"""
     model.train()
     model = model.to(model.device)
@@ -171,7 +171,7 @@ def train(model, epochs, log_interval):
     train_loss = 0
     train_loader = DataLoader(
         datasets.ImageFolder(
-            'images', 
+            'data\\inputs', 
             transform = transforms.ToTensor()),
         batch_size = model.batch_size, 
         shuffle = True
@@ -191,7 +191,7 @@ def train(model, epochs, log_interval):
                     len(train_loader.dataset),
                     100. * batch_idx / len(train_loader),
                     loss.item() / len(inputs)))
-                path = f'images\\outputs\\{model.type}\\{model.name}'
+                path = f'data\\outputs\\{model.type}\\{model.name}'
                 if not os.path.exists(path):
                     os.makedirs(path)
                 sample_input = inputs[0].squeeze(0).detach().cpu()
@@ -204,18 +204,3 @@ def train(model, epochs, log_interval):
                 
         print('====> Epoch: {} Average loss: {:.4f}'.format(epoch, train_loss / len(train_loader.dataset)))
         model.save_model()
-
-if __name__ == "__main__":
-    params = {
-        'z_size' : 128,
-        'batch_size' : 64,
-        'learning_rate' : 0.0001,
-        'kl_tolerance' : 0.5,
-        'batch_norm' : True
-    }
-
-    model = ConvVAE('Alpha - BN', 'Conv VAE', params)
-    train(model, 100, 500)
-
-
-

@@ -9,7 +9,7 @@ class Neural_Network(nn.Module):
     __metaclass__ = ABCMeta
 
     @abstractmethod
-    def __init__(self, name, type_, params):
+    def __init__(self, name, params, load_model):
         """Initialize an Neural Network model given a dictionary of parameters.
 
         Params
@@ -34,19 +34,17 @@ class Neural_Network(nn.Module):
     def load_model(self, file_name):
         """Loads the models parameters and weights"""
         
-        path = f'checkpoints\\{self.type}\\{self.name}'
+        path = f'checkpoints\\{self.type}\\{self.name}\\'
 
-        if file_name is None:
-            list_of_files = glob(path) 
+        if file_name == 'Latest':
+            list_of_files = [path + x for x in os.listdir(path)]
             latest_file = max(list_of_files, key = os.path.getctime)
             _, file_name = os.path.split(latest_file)
         
         path = f'checkpoints\\{self.type}\\{self.name}\\{file_name}'
-            
         checkpoint = torch.load(path, map_location = lambda storage, loc: storage)
         self.params = checkpoint['params']
-        self.load_state_dict(checkpoint['weights'])
-
+        self.weights = checkpoint['weights']
 
     def save_model(self):
         """Loads the models parameters and weights"""
