@@ -47,7 +47,7 @@ class Neural_Network(nn.Module):
         self.weights = checkpoint['weights']
 
     def save_model(self):
-        """Loads the models parameters and weights"""
+        """Saves the models parameters and weights"""
         
         checkpoint = {
             'params' : self.params,

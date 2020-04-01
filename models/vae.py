@@ -64,7 +64,7 @@ class Conv(nn.Module):
 
 
 
-class ConvVAE(Neural_Network):
+class CNN_VAE(Neural_Network):
     """Convolutional Variational Auto Encoder"""
 
     def __init__(self, name, params, load_model = False):
@@ -76,7 +76,7 @@ class ConvVAE(Neural_Network):
         * **params** (dict-like) --- a dictionary of parameters
         """
         
-        super(ConvVAE, self).__init__(name, params, load_model)
+        super(CNN_VAE, self).__init__(name, params, load_model)
         self.name = name
         self.type = 'Conv VAE'
         if load_model != False:
@@ -99,8 +99,8 @@ class ConvVAE(Neural_Network):
             Conv(256, 512, 4, 2, 0, conv = nn.Conv2d, activation = nn.ReLU, batch_norm = self.batch_norm)
         )
     
-        self.enc_conv_mu = Conv(512, 1024, 1, 2, 0, conv = nn.Conv1d, activation = nn.ReLU, batch_norm = self.batch_norm)
-        self.enc_conv_logvar = Conv(512, 1024, 1, 2, 0, conv = nn.Conv1d, activation = nn.ReLU, batch_norm = self.batch_norm)
+        self.enc_conv_mu = Conv(512, self.z_size, 1, 2, 0, conv = nn.Conv1d, activation = nn.ReLU, batch_norm = self.batch_norm)
+        self.enc_conv_logvar = Conv(512, self.z_size, 1, 2, 0, conv = nn.Conv1d, activation = nn.ReLU, batch_norm = self.batch_norm)
         self.epsilon = Distribution((self.batch_size, self.z_size))
 
         # The Decoder
@@ -112,10 +112,11 @@ class ConvVAE(Neural_Network):
             Conv(32, 3, 6, 2, 0, conv = nn.ConvTranspose2d, activation = nn.Sigmoid, batch_norm = False)
         )
 
-        self.dec_conv = Conv(1024, 512, 1, 2, 0, conv = nn.Conv1d, activation = nn.ReLU, batch_norm = self.batch_norm)
+        self.dec_conv = Conv(self.z_size, 512, 1, 2, 0, conv = nn.Conv1d, activation = nn.ReLU, batch_norm = self.batch_norm)
         
         if load_model != False:
             self.load_state_dict(self.weights)
+        print(self)
 
     def forward(self, x):
         # print('INPUT', x.shape)
@@ -176,6 +177,7 @@ def train_vae(model, epochs, log_interval):
         batch_size = model.batch_size, 
         shuffle = True
     )
+    count = 0
     for epoch in range(epochs):
         for batch_idx, (inputs, _) in enumerate(train_loader):
             inputs = inputs.to(model.device)
@@ -185,7 +187,8 @@ def train_vae(model, epochs, log_interval):
             loss.backward()
             train_loss += loss.item()
             optimizer.step()
-            if batch_idx % log_interval == 0:
+            count += 1
+            if count % log_interval == 0:
                 print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
                     epoch, batch_idx * len(inputs), 
                     len(train_loader.dataset),
@@ -203,4 +206,4 @@ def train_vae(model, epochs, log_interval):
                 sample_output.save(f'{path}\\E - {epoch} B - {batch_idx} output.png',"PNG")
                 
         print('====> Epoch: {} Average loss: {:.4f}'.format(epoch, train_loss / len(train_loader.dataset)))
-        model.save_model()
+    model.save_model()
