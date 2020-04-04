@@ -1,4 +1,4 @@
-import gym, torch, cv2, os
+import gym, torch, cv2, os, time
 import numpy as np
 from pyglet.window import key
 import matplotlib.pyplot as plt
@@ -71,7 +71,6 @@ def create_vae_training_data(frames):
         for idx in range(len(ACTION_LABELS)):
             if str(action) == ACTION_LABELS[idx]:
                 actions.append(ENCODED_ACTIONS[idx])
-                print(len(ENCODED_ACTIONS[idx]))
                 break
             if idx == len(ACTION_LABELS) - 1:
                 raise Exception(f'All actions not encoded!! Failed Action = {action_label}')
@@ -156,12 +155,15 @@ def train_controller_(name, vae_name, mdn_name):
     env = gym.make('CarRacing-v0')
     vae = CNN_VAE(vae_name, None, 'Latest')
     mdn = MDN_RNN(mdn_name, None, 'Latest')
-    controller = Controller(name, params, False)    
+    controller = Controller(name, params, False)  
+    vae.to(vae.device)
+    mdn.to(mdn.device)  
+    controller.to(controller.device)
 
     params = {
-        'num_agents' : 500, # number of random agents to create
-        'runs' : 3, # number of runs to evaluate fitness score
-        'timesteps': 1000, # timesteps to run in environment to get cumulative reward.. Random actions till LSTM starts working
+        'num_agents' : 1, # number of random agents to create
+        'runs' : 1, # number of runs to evaluate fitness score
+        'timesteps': 20, # timesteps to run in environment to get cumulative reward.. Random actions till LSTM starts working
         'top_parents' : 20, # number of parents from agents
         'generations' : 1000, # run evolution for X generations
         'mutation_power' : 0.2, # strength of mutation, set from https://arxiv.org/pdf/1712.06567.pdf
@@ -192,15 +194,20 @@ def interact(agent, env, params):
     s = 0
     za = None
     
-    for _ in range(timesteps):
+    for timestep in range(timesteps):
+        print(timestep)
         hidden = (hidden[0].detach(), hidden[1].detach())
-        observation = transforms.ToTensor()(observation.copy()).unsqueeze(0)
+        observation = transforms.ToTensor()(observation.copy()).unsqueeze(0).to(agent.device)
         
         mu, logvar = vae.encode(observation)
         z = vae.reparameterize(mu, logvar).squeeze(-1)
-        action = agent(z, hidden[0].squeeze(0))
+        action_probabilities = agent(z, hidden[0].squeeze(0)).squeeze(0).cpu().numpy()
 
-        za_ = torch.cat((z, action), dim = 1).unsqueeze(1)
+        action_idx = np.random.choice(list(ENCODED_ACTIONS.keys()), 1, p = action_probabilities)[0]
+        encoded_action = torch.tensor(ENCODED_ACTIONS[action_idx]).float().to(agent.device).unsqueeze(0)
+        action = ACTIONS[action_idx]
+
+        za_ = torch.cat((z, encoded_action), dim = 1).unsqueeze(1)
 
         if za is None:
             za = za_
@@ -208,12 +215,10 @@ def interact(agent, env, params):
             za = torch.cat((za, za_), dim = 1)
             if za.shape[1] > mdn.seq_len:
                 # truncates old data if sequence length is too long
-                (_, za) = torch.split(za, mdn.seq_len, dim = 1) 
+                (za, _) = torch.split(za, mdn.seq_len, dim = 1) 
         
         _, hidden = mdn(za, hidden)
 
-        # output_probabilities = agent(inp).detach().numpy()[0]
-        # action = np.random.choice(range(game_actions), 1, p = output_probabilities).item()
         observation, reward, done, info = env.step(action)
         cumulative_rewards += reward
         s = s + 1
@@ -225,5 +230,5 @@ def interact(agent, env, params):
 # create_vae_training_data(3000)
 # train_vae_('Alpha - BN SMALL')
 # create_mdn_training_data('Alpha - BN SMALL')
-train_mdn_('Alpha - TEST')
-# train_controller_('Alpha - TEST', 'Alpha - BN SMALL', 'Alpha - TEST')
+# train_mdn_('Alpha - TEST')
+train_controller_('Alpha - TEST', 'Alpha - BN SMALL', 'Alpha - TEST')

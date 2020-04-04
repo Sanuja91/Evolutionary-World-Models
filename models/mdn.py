@@ -90,31 +90,6 @@ def train_mdn(mdn, epochs, log_interval):
     z = torch.load('data\\inputs\\tensors\\zs.pt').float()
     actions = torch.load('data\\inputs\\tensors\\actions.pt').float()
     z = torch.cat((z, actions), dim = 1).unsqueeze(0)    
-    count = 0
-    # for epoch in range(epochs):
-    #     # Set initial hidden and cell states
-    #     hidden = mdn.init_hidden(1)
-
-    #     for i in range(0, z.size(1) - mdn.seq_len, mdn.seq_len):
-    #         # Get mini-batch inputs and targets
-    #         inputs = z[ : , i : i + mdn.seq_len, : ]
-    #         targets = z[ : , (i + 1) : (i + 1) + mdn.seq_len, : ]
-
-    #         print(inputs.shape)
-
-    #         # Forward pass
-    #         hidden = (hidden[0].detach(), hidden[1].detach())
-    #         (pi, mu, sigma), hidden = mdn(inputs, hidden)
-    #         loss = loss_function(targets, pi, mu, sigma)
-
-    #         # Backward and optimize
-    #         mdn.zero_grad()
-    #         loss.backward()
-    #         clip_grad_norm_(mdn.parameters(), mdn.grad_clip)
-    #         optimizer.step()
-    #         count += 1
-    #         if count % log_interval == 0:
-    #             print('Epoch [{}/{}], Loss: {:.4f}'.format(epoch, epochs, loss.item()))
     
     # Creates batches
     inputs = []

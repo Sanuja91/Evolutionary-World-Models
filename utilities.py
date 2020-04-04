@@ -3,17 +3,14 @@ import numpy as np
 import pandas as pd
 
 def one_hot_encode_actions(actions):
-    actions = [''.join(str(action)) for action in actions]
-    actions = pd.DataFrame(actions, columns = ['actions'])
+    actions = np.array([''.join(str(action)) for action in actions])
 
-    # creating instance of labelencoder
-    labelencoder = LabelEncoder()
-    actions['labels'] = labelencoder.fit_transform(actions['actions'])
-
-    # creating instance of one-hot-encoder
-    enc = OneHotEncoder(handle_unknown = 'ignore')
-    encoded = pd.DataFrame(enc.fit_transform(actions).toarray())
+    # create one hot encoding
+    enc = OneHotEncoder(sparse = False)
+    encoded = pd.DataFrame(enc.fit_transform(actions.reshape(len(actions), 1)))
+    
+    # create dicts of encodings and actions
+    actions = dict(zip(encoded.index.values, actions))
     encoded = dict(zip(encoded.index.values, encoded.values))
-    actions.set_index('labels', inplace = True)
-    actions = dict(zip(actions.index.values, np.ndarray.flatten(actions.values)))
+    
     return actions, encoded

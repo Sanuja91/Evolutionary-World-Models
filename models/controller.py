@@ -28,13 +28,17 @@ class Controller(Neural_Network):
         self.action_size = self.params['action_size']
         self.device = self.get_device()
         
-        self.fc = nn.Linear(self.z_size + self.hidden_size, self.action_size)
+        self.fc1 = nn.Linear(self.z_size + self.hidden_size, 100)
+        self.fc2 = nn.Linear(100, self.action_size)
+        self.softmax = nn.Softmax(dim = 1)
 
         if load_model != False:
             self.load_state_dict(self.weights)
         
         print(self, "\n\n")
 
-    def forward(self, *inputs):
-        cat_in = torch.cat(inputs, dim = 1)
-        return self.fc(cat_in)
+    def forward(self, *x):
+        x = torch.cat(x, dim = 1)
+        x = self.fc1(x)
+        x = self.fc2(x)
+        return self.softmax(x)
