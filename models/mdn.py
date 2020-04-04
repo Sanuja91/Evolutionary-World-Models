@@ -46,7 +46,7 @@ class MDN_RNN(Neural_Network):
         if load_model != False:
             self.load_state_dict(self.weights)
         
-        print(self)
+        print(self, "\n\n")
 
     def get_mixture_coef(self, y):
         rollout_length = y.size(1)
@@ -81,12 +81,12 @@ def loss_function(y, pi, mu, sigma):
     loss = -torch.log(loss)
     return loss.mean()
 
-def train_mdn(model, epochs, log_interval):
+def train_mdn(mdn, epochs, log_interval):
     """Trains the MDN RNN"""
 
-    model.train()
-    model = model.to(model.device)
-    optimizer = optim.Adam(model.parameters(), lr = model.learning_rate)
+    mdn.train()
+    mdn = mdn.to(mdn.device)
+    optimizer = optim.Adam(mdn.parameters(), lr = mdn.learning_rate)
     z = torch.load('data\\inputs\\tensors\\zs.pt').float()
     actions = torch.load('data\\inputs\\tensors\\actions.pt').float()
 
@@ -94,24 +94,24 @@ def train_mdn(model, epochs, log_interval):
     count = 0
     # for epoch in range(epochs):
     #     # Set initial hidden and cell states
-    #     hidden = model.init_hidden(1)
+    #     hidden = mdn.init_hidden(1)
 
-    #     for i in range(0, z.size(1) - model.seq_len, model.seq_len):
+    #     for i in range(0, z.size(1) - mdn.seq_len, mdn.seq_len):
     #         # Get mini-batch inputs and targets
-    #         inputs = z[ : , i : i + model.seq_len, : ]
-    #         targets = z[ : , (i + 1) : (i + 1) + model.seq_len, : ]
+    #         inputs = z[ : , i : i + mdn.seq_len, : ]
+    #         targets = z[ : , (i + 1) : (i + 1) + mdn.seq_len, : ]
 
     #         print(inputs.shape)
 
     #         # Forward pass
     #         hidden = (hidden[0].detach(), hidden[1].detach())
-    #         (pi, mu, sigma), hidden = model(inputs, hidden)
+    #         (pi, mu, sigma), hidden = mdn(inputs, hidden)
     #         loss = loss_function(targets, pi, mu, sigma)
 
     #         # Backward and optimize
-    #         model.zero_grad()
+    #         mdn.zero_grad()
     #         loss.backward()
-    #         clip_grad_norm_(model.parameters(), model.grad_clip)
+    #         clip_grad_norm_(mdn.parameters(), mdn.grad_clip)
     #         optimizer.step()
     #         count += 1
     #         if count % log_interval == 0:
@@ -120,13 +120,13 @@ def train_mdn(model, epochs, log_interval):
     # Creates batches
     inputs = []
     targets = []
-    for i in range(0, z.size(1) - model.seq_len, model.seq_len):
+    for i in range(0, z.size(1) - mdn.seq_len, mdn.seq_len):
         # Get mini-batch inputs and targets
-        inputs.append(z[ : , i : i + model.seq_len, : ])
-        targets.append(z[ : , (i + 1) : (i + 1) + model.seq_len, : ])
+        inputs.append(z[ : , i : i + mdn.seq_len, : ])
+        targets.append(z[ : , (i + 1) : (i + 1) + mdn.seq_len, : ])
 
-    if model.batch_size > len(inputs): 
-        model.batch_size = len(inputs)
+    if mdn.batch_size > len(inputs): 
+        mdn.batch_size = len(inputs)
     else:
         raise Exception('Code for handling larger batch sizes not written.. Easy fix')
     
@@ -136,17 +136,17 @@ def train_mdn(model, epochs, log_interval):
 
     for epoch in range(epochs):
         # Set initial hidden and cell states
-        hidden = model.init_hidden(model.batch_size)
+        hidden = mdn.init_hidden(mdn.batch_size)
 
         # Forward pass
         hidden = (hidden[0].detach(), hidden[1].detach())
-        (pi, mu, sigma), hidden = model(inputs, hidden)
+        (pi, mu, sigma), hidden = mdn(inputs, hidden)
         loss = loss_function(targets, pi, mu, sigma)
 
         # Backward and optimize
-        model.zero_grad()
+        mdn.zero_grad()
         loss.backward()
-        clip_grad_norm_(model.parameters(), model.grad_clip)
+        clip_grad_norm_(mdn.parameters(), mdn.grad_clip)
         optimizer.step()
         print('Epoch [{}/{}], Loss: {:.4f}'.format(epoch, epochs, loss.item()))
-    model.save_model()
+    mdn.save_model()

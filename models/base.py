@@ -2,7 +2,6 @@ import torch, os
 import torch.nn as nn
 from abc import ABCMeta, abstractmethod
 from time import time
-from glob import glob
 
 class Neural_Network(nn.Module):
     """Base layer for all neural network models"""
@@ -19,17 +18,16 @@ class Neural_Network(nn.Module):
         * **params** (dict-like) --- a dictionary of parameters
         """
         super(Neural_Network, self).__init__()
-
     
     def get_device(self):
         """Checks if GPU is available else runs on CPU"""
         device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         print('\nAI Running on {}\n'.format(device))
+        
         if str(device) == 'cuda':
             torch.backends.cudnn.benchmark = True
             torch.backends.cudnn.enabled = True
         return device
-
 
     def load_model(self, file_name):
         """Loads the models parameters and weights"""
@@ -60,11 +58,3 @@ class Neural_Network(nn.Module):
         
         path += f'\\{str(time())}.pth'
         torch.save(checkpoint, path)
-
-
-        
-        
-
-
-
-

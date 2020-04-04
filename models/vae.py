@@ -116,7 +116,7 @@ class CNN_VAE(Neural_Network):
         
         if load_model != False:
             self.load_state_dict(self.weights)
-        print(self)
+        print(self, "\n\n")
 
     def forward(self, x):
         # print('INPUT', x.shape)
@@ -164,25 +164,25 @@ def loss_function(outputs, inputs, mu, logvar):
     KLD = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
     return BCE + KLD
 
-def train_vae(model, epochs, log_interval):
+def train_vae(vae, epochs, log_interval):
     """Trains the Conv VAE"""
-    model.train()
-    model = model.to(model.device)
-    optimizer = optim.Adam(model.parameters(), lr = model.learning_rate)
+    vae.train()
+    vae = vae.to(vae.device)
+    optimizer = optim.Adam(vae.parameters(), lr = vae.learning_rate)
     train_loss = 0
     train_loader = DataLoader(
         datasets.ImageFolder(
             'data\\inputs', 
             transform = transforms.ToTensor()),
-        batch_size = model.batch_size, 
+        batch_size = vae.batch_size, 
         shuffle = True
     )
     count = 0
     for epoch in range(epochs):
         for batch_idx, (inputs, _) in enumerate(train_loader):
-            inputs = inputs.to(model.device)
+            inputs = inputs.to(vae.device)
             optimizer.zero_grad()
-            outputs, mu, logvar = model(inputs)
+            outputs, mu, logvar = vae(inputs)
             loss = loss_function(outputs, inputs, mu, logvar)
             loss.backward()
             train_loss += loss.item()
@@ -194,7 +194,7 @@ def train_vae(model, epochs, log_interval):
                     len(train_loader.dataset),
                     100. * batch_idx / len(train_loader),
                     loss.item() / len(inputs)))
-                path = f'data\\outputs\\{model.type}\\{model.name}'
+                path = f'data\\outputs\\{vae.type}\\{vae.name}'
                 if not os.path.exists(path):
                     os.makedirs(path)
                 sample_input = inputs[0].squeeze(0).detach().cpu()
@@ -206,4 +206,4 @@ def train_vae(model, epochs, log_interval):
                 sample_output.save(f'{path}\\E - {epoch} B - {batch_idx} output.png',"PNG")
                 
         print('====> Epoch: {} Average loss: {:.4f}'.format(epoch, train_loss / len(train_loader.dataset)))
-    model.save_model()
+    vae.save_model()
