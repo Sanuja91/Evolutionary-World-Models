@@ -195,7 +195,6 @@ def interact(agent, env, params):
     za = None
     
     for timestep in range(timesteps):
-        print(timestep)
         hidden = (hidden[0].detach(), hidden[1].detach())
         observation = transforms.ToTensor()(observation.copy()).unsqueeze(0).to(agent.device)
         
