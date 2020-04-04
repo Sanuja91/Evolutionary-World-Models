@@ -168,6 +168,7 @@ def interact(agent, env, params):
         
         mu, logvar = vae.encode(observation)
         z = vae.reparameterize(mu, logvar)
+        print("Z", z.shape, "HIDDEN", hidden[0].shape)
         action = agent(z, hidden[0])
         _, hidden = mdn(z, hidden)
 
