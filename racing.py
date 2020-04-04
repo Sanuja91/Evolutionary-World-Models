@@ -6,11 +6,29 @@ from torch.utils.data import DataLoader
 from torchvision import datasets, transforms
 from models.vae import CNN_VAE, train_vae
 from models.mdn import MDN_RNN, train_mdn
-from models.controller import Controller, evolve_controller
+from models.controller import Controller
 from evolve.base import Simple_Asexual_Evolution
+from utilities import one_hot_encode_actions
 
 Z_SIZE = 128
-ACTION_SIZE = 3
+
+ACTIONS = [
+    np.array([0.0, 0.0, 0.0]),       # do nothing
+    np.array([0.0, 1.0, 0.0]),       # forward
+    np.array([0.0, 0.0, 1.0]),       # stop
+    np.array([1.0, 0.0, 0.0]),       # right
+    np.array([-1.0, 0.0, 0.0]),      # left
+    np.array([1.0, 1.0, 0.0]),       # forward right
+    np.array([-1.0, 1.0, 0.0]),      # forward left
+    np.array([1.0, 0.0, 1.0]),       # stop right
+    np.array([-1.0, 0.0, 1.0]),      # stop left
+    np.array([0.0, 1.0, 1.0]),       # forward stop
+    np.array([-1.0, 1.0, 1.0]),      # forward stop left
+    np.array([1.0, 1.0, 1.0])        # forward stop right
+]
+
+ACTION_LABELS, ENCODED_ACTIONS = one_hot_encode_actions(ACTIONS)
+ACTION_SIZE = len(ENCODED_ACTIONS[0])
 
 def create_vae_training_data(frames):
     """Creates training images for CNN-VAE"""
@@ -21,15 +39,16 @@ def create_vae_training_data(frames):
     def key_press(k, mod):
         global restart
         if k == 0xff0d: restart = True
-        if k == key.LEFT:  action[0] = -1.0
-        if k == key.RIGHT: action[0] = +1.0
-        if k == key.UP:    action[1] = +1.0
-        if k == key.DOWN:  action[2] = +0.8   # set 1.0 for wheels to block to zero rotation
+        if k == key.LEFT:  action[0] = - 1.0
+        if k == key.RIGHT: action[0] = + 1.0
+        if k == key.UP:    action[1] = + 1.0
+        if k == key.DOWN:  action[2] = + 1.0   
+
     def key_release(k, mod):
-        if k == key.LEFT  and action[0] == -1.0: action[0] = 0
-        if k == key.RIGHT and action[0] == +1.0: action[0] = 0
-        if k == key.UP:    action[1] = 0
-        if k == key.DOWN:  action[2] = 0
+        if k == key.LEFT  and action[0] == - 1.0: action[0] = 0.0
+        if k == key.RIGHT and action[0] == + 1.0: action[0] = 0.0
+        if k == key.UP:    action[1] = 0.0
+        if k == key.DOWN:  action[2] = 0.0
 
     path = f'data\\inputs\\images'
     if not os.path.exists(path):
@@ -47,7 +66,15 @@ def create_vae_training_data(frames):
         env.viewer.window.on_key_release = key_release
         cv2.imwrite(f'{path}\\{count}.png', obs)
         obs, reward, done, info = env.step(action)
-        actions.append(action)
+        action_label = [''.join(str(action_)) for action_ in action]
+
+        for idx in range(len(ACTION_LABELS)):
+            if str(action) == ACTION_LABELS[idx]:
+                actions.append(ENCODED_ACTIONS[idx])
+                print(len(ENCODED_ACTIONS[idx]))
+                break
+            if idx == len(ACTION_LABELS) - 1:
+                raise Exception(f'All actions not encoded!! Failed Action = {action_label}')
     
     torch.save(torch.tensor(actions), f'{action_path}\\actions.pt')
     env.close()
@@ -104,10 +131,10 @@ def train_mdn_(name):
     params = {
         'z_size' : Z_SIZE,
         'action_size' : ACTION_SIZE,
-        'n_hidden' : 256,
+        'hidden_size' : 256,
         'learning_rate' : 0.0001,
-        'n_gaussians' : 5,
-        'n_layers' : 1,
+        'gaussian_size' : 5,
+        'stacked_layers' : 1,
         'seq_len' : 50,
         'grad_clip' : 1.0,
         'batch_size' : 200,
@@ -122,7 +149,7 @@ def train_controller_(name, vae_name, mdn_name):
     params = {
         'z_size' : Z_SIZE,
         'action_size' : ACTION_SIZE,
-        'n_hidden' : 256,
+        'hidden_size' : 256,
         'batch_norm' : True
     }
 
@@ -134,7 +161,7 @@ def train_controller_(name, vae_name, mdn_name):
     params = {
         'num_agents' : 500, # number of random agents to create
         'runs' : 3, # number of runs to evaluate fitness score
-        'timesteps': 1000, # timesteps to run in environment to get cumulative reward
+        'timesteps': 1000, # timesteps to run in environment to get cumulative reward.. Random actions till LSTM starts working
         'top_parents' : 20, # number of parents from agents
         'generations' : 1000, # run evolution for X generations
         'mutation_power' : 0.2, # strength of mutation, set from https://arxiv.org/pdf/1712.06567.pdf
@@ -154,29 +181,39 @@ def interact(agent, env, params):
     timesteps = params['timesteps']
     vae = params['vae']
     mdn = params['mdn']
-    
-    hidden = mdn.init_hidden(1)
+    mdn.batch_size = 1
+
+    hidden = mdn.init_hidden(mdn.batch_size)
     vae.eval()
     mdn.eval()
     agent.eval()
     observation = env.reset()
     cumulative_rewards = 0
     s = 0
+    za = None
+    
     for _ in range(timesteps):
-        print(observation.shape)
+        hidden = (hidden[0].detach(), hidden[1].detach())
         observation = transforms.ToTensor()(observation.copy()).unsqueeze(0)
         
         mu, logvar = vae.encode(observation)
-        z = vae.reparameterize(mu, logvar)
-        print("Z", z.shape, "HIDDEN", hidden[0].shape)
-        action = agent(z, hidden[0])
-        _, hidden = mdn(z, hidden)
+        z = vae.reparameterize(mu, logvar).squeeze(-1)
+        action = agent(z, hidden[0].squeeze(0))
 
-        print(action.shape)
-        exit()
+        za_ = torch.cat((z, action), dim = 1).unsqueeze(1)
 
-        output_probabilities = agent(inp).detach().numpy()[0]
-        action = np.random.choice(range(game_actions), 1, p = output_probabilities).item()
+        if za is None:
+            za = za_
+        else:
+            za = torch.cat((za, za_), dim = 1)
+            if za.shape[1] > mdn.seq_len:
+                # truncates old data if sequence length is too long
+                (_, za) = torch.split(za, mdn.seq_len, dim = 1) 
+        
+        _, hidden = mdn(za, hidden)
+
+        # output_probabilities = agent(inp).detach().numpy()[0]
+        # action = np.random.choice(range(game_actions), 1, p = output_probabilities).item()
         observation, reward, done, info = env.step(action)
         cumulative_rewards += reward
         s = s + 1
@@ -188,5 +225,5 @@ def interact(agent, env, params):
 # create_vae_training_data(3000)
 # train_vae_('Alpha - BN SMALL')
 # create_mdn_training_data('Alpha - BN SMALL')
-# train_mdn_('Alpha - TEST')
-train_controller_('Alpha - TEST', 'Alpha - BN SMALL', 'Alpha - TEST')
+train_mdn_('Alpha - TEST')
+# train_controller_('Alpha - TEST', 'Alpha - BN SMALL', 'Alpha - TEST')

@@ -29,19 +29,19 @@ class MDN_RNN(Neural_Network):
             self.params = params
         self.z_size = self.params['z_size']
         self.action_size = self.params['action_size']
-        self.n_hidden = self.params['n_hidden']
-        self.n_gaussians = self.params['n_gaussians']
-        self.n_layers = self.params['n_layers']
+        self.hidden_size = self.params['hidden_size']
+        self.gaussian_size = self.params['gaussian_size']
+        self.stacked_layers = self.params['stacked_layers']
         self.seq_len = self.params['seq_len']
         self.learning_rate = self.params['learning_rate']
         self.grad_clip = self.params['grad_clip']
         self.batch_size = self.params['batch_size']
         self.device = self.get_device()
         
-        self.lstm = nn.LSTM(self.z_size + self.action_size, self.n_hidden, self.n_layers, batch_first = True)
-        self.fc1 = nn.Linear(self.n_hidden, self.n_gaussians * (self.z_size + self.action_size))
-        self.fc2 = nn.Linear(self.n_hidden, self.n_gaussians * (self.z_size + self.action_size))
-        self.fc3 = nn.Linear(self.n_hidden, self.n_gaussians * (self.z_size + self.action_size))
+        self.lstm = nn.LSTM(self.z_size + self.action_size, self.hidden_size, self.stacked_layers, batch_first = True)
+        self.fc1 = nn.Linear(self.hidden_size, self.gaussian_size * (self.z_size + self.action_size))
+        self.fc2 = nn.Linear(self.hidden_size, self.gaussian_size * (self.z_size + self.action_size))
+        self.fc3 = nn.Linear(self.hidden_size, self.gaussian_size * (self.z_size + self.action_size))
         
         if load_model != False:
             self.load_state_dict(self.weights)
@@ -52,9 +52,9 @@ class MDN_RNN(Neural_Network):
         rollout_length = y.size(1)
         pi, mu, sigma = self.fc1(y), self.fc2(y), self.fc3(y)
         
-        pi = pi.view(-1, rollout_length, self.n_gaussians, self.z_size + self.action_size)
-        mu = mu.view(-1, rollout_length, self.n_gaussians, self.z_size + self.action_size)
-        sigma = sigma.view(-1, rollout_length, self.n_gaussians, self.z_size + self.action_size)
+        pi = pi.view(-1, rollout_length, self.gaussian_size, self.z_size + self.action_size)
+        mu = mu.view(-1, rollout_length, self.gaussian_size, self.z_size + self.action_size)
+        sigma = sigma.view(-1, rollout_length, self.gaussian_size, self.z_size + self.action_size)
         
         pi = F.softmax(pi, 2)
         sigma = torch.exp(sigma)
@@ -68,8 +68,8 @@ class MDN_RNN(Neural_Network):
     
     def init_hidden(self, batch_size):
         return (
-            torch.zeros(self.n_layers, batch_size, self.n_hidden).to(self.device),
-            torch.zeros(self.n_layers, batch_size, self.n_hidden).to(self.device)
+            torch.zeros(self.stacked_layers, batch_size, self.hidden_size).to(self.device),
+            torch.zeros(self.stacked_layers, batch_size, self.hidden_size).to(self.device)
         )
 
 
@@ -89,8 +89,7 @@ def train_mdn(mdn, epochs, log_interval):
     optimizer = optim.Adam(mdn.parameters(), lr = mdn.learning_rate)
     z = torch.load('data\\inputs\\tensors\\zs.pt').float()
     actions = torch.load('data\\inputs\\tensors\\actions.pt').float()
-
-    z = torch.cat((z, actions), dim = 1).unsqueeze(0)
+    z = torch.cat((z, actions), dim = 1).unsqueeze(0)    
     count = 0
     # for epoch in range(epochs):
     #     # Set initial hidden and cell states
@@ -130,9 +129,8 @@ def train_mdn(mdn, epochs, log_interval):
     else:
         raise Exception('Code for handling larger batch sizes not written.. Easy fix')
     
-    inputs = torch.stack(inputs).squeeze(1)
-    targets = torch.stack(targets).squeeze(1)
-    print(inputs.shape)
+    inputs = torch.stack(inputs).squeeze(1).to(mdn.device)
+    targets = torch.stack(targets).squeeze(1).to(mdn.device)
 
     for epoch in range(epochs):
         # Set initial hidden and cell states

@@ -24,11 +24,11 @@ class Controller(Neural_Network):
         else:
             self.params = params
         self.z_size = self.params['z_size']
-        self.n_hidden = self.params['n_hidden']
+        self.hidden_size = self.params['hidden_size']
         self.action_size = self.params['action_size']
         self.device = self.get_device()
         
-        self.fc = nn.Linear(self.z_size + self.n_hidden, self.action_size)
+        self.fc = nn.Linear(self.z_size + self.hidden_size, self.action_size)
 
         if load_model != False:
             self.load_state_dict(self.weights)
@@ -38,11 +38,3 @@ class Controller(Neural_Network):
     def forward(self, *inputs):
         cat_in = torch.cat(inputs, dim = 1)
         return self.fc(cat_in)
-
-def evolve_controller(model, vae, mdn, evolve, epochs, log_interval):
-    """Evolves the controller"""
-
-    
-    
-
-
