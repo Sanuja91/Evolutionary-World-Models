@@ -7,7 +7,7 @@ from torchvision import datasets, transforms
 from models.vae import CNN_VAE, train_vae
 from models.mdn import MDN_RNN, train_mdn
 from models.controller import Controller
-from evolve.base import Simple_Asexual_Evolution
+from evolve.base import Simple_Asexual_Evolution, Elite_Evolution
 from utilities import one_hot_encode_actions
 
 Z_SIZE = 128
@@ -161,10 +161,11 @@ def train_controller_(name, vae_name, mdn_name):
     controller.to(controller.device)
 
     params = {
-        'num_agents' : 1, # number of random agents to create
+        'render': True,
+        'num_agents' : 10, # number of random agents to create
         'runs' : 1, # number of runs to evaluate fitness score
-        'timesteps': 20, # timesteps to run in environment to get cumulative reward.. Random actions till LSTM starts working
-        'top_parents' : 20, # number of parents from agents
+        'timesteps': 1000, # timesteps to run in environment to get cumulative reward.. Random actions till LSTM starts working
+        'top_parents' : 3, # number of parents from agents
         'generations' : 1000, # run evolution for X generations
         'mutation_power' : 0.2, # strength of mutation, set from https://arxiv.org/pdf/1712.06567.pdf
         'vae' : vae,
@@ -183,6 +184,7 @@ def interact(agent, env, params):
     timesteps = params['timesteps']
     vae = params['vae']
     mdn = params['mdn']
+    render = params['render']
     mdn.batch_size = 1
 
     hidden = mdn.init_hidden(mdn.batch_size)
@@ -193,8 +195,9 @@ def interact(agent, env, params):
     cumulative_rewards = 0
     s = 0
     za = None
-    
     for timestep in range(timesteps):
+        if render:
+            env.render()
         hidden = (hidden[0].detach(), hidden[1].detach())
         observation = transforms.ToTensor()(observation.copy()).unsqueeze(0).to(agent.device)
         
@@ -223,6 +226,7 @@ def interact(agent, env, params):
         s = s + 1
         if done:
             break
+    print("CUMULATIVE REWARD", cumulative_rewards)
     return cumulative_rewards
 
 
