@@ -48,6 +48,8 @@ class Natural_Evolution(Evolution):
         """Traditional Human Evolution"""
 
         elite_index = top_agents_idxs[0]
+        
+        exit()
 
         child_agents = []
 

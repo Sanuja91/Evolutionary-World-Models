@@ -161,6 +161,7 @@ def train_controller_(name, vae_name, mdn_name):
 
     params = {
         'render': False,
+        'parallel': False,
         'gym': 'CarRacing-v0',
         'num_agents' : 10, # number of random agents to create
         'runs' : 1, # number of runs to evaluate fitness score

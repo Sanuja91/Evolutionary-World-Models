@@ -31,6 +31,8 @@ class Evolution():
         self.top_parents = params['top_parents']
         self.generations = params['generations']
         self.mutation_power = params['mutation_power']
+        self.parallel = params['parallel']
+        
 
     @abstractmethod
     def reproduce(sorted_parent_indexes, elite_index):
@@ -93,14 +95,14 @@ class Evolution():
 
         self.agents = self.generate_random_agents()
 
-        if os.name != 'nt':
+        if os.name != 'nt' and self.parallel:
             import ray
             ray.init()
         else:
             env = gym.make(self.gym)
 
         for generation in range(self.generations):
-            if os.name != 'nt':
+            if os.name != 'nt' and self.parallel:
                 fitness_scores = self.calculate_fitness_parallel(ray)
             else:
                 fitness_scores = self.calculate_fitness()
