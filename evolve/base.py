@@ -1,15 +1,16 @@
-import torch, os
+import torch, os, gym
 import torch.nn as nn
 import numpy as np
 from abc import ABCMeta, abstractmethod
 from time import time
 from copy import deepcopy
+import ray, gym
 
 class Evolution():
     """Base layer for evolution strategies"""
     __metaclass__ = ABCMeta
 
-    def __init__(self, env, agent, interact, params):
+    def __init__(self, agent, interact, params):
         """Initialize an Evolution class given a dictionary of parameters.
 
         Params
@@ -19,11 +20,11 @@ class Evolution():
         * **interact** (function) --- function to allow interaction between agent and environment to return cumulative rewards
         * **params** (dict-like) --- a dictionary of parameters
         """
-        
-        self.env = env
+
         self.agent = agent
         self.interact = interact
         self.params = params
+        self.gym = params['gym']
         self.num_agents = params['num_agents']
         self.runs = params['runs']
         self.timesteps = params['timesteps']
@@ -36,7 +37,6 @@ class Evolution():
         """An abstract function where you take the parent agents and replace them with their children"""
 
         pass
-        
     
     def generate_random_agents(self):
         """Creates X random agents"""
@@ -52,13 +52,12 @@ class Evolution():
     def calculate_fitness(self):
         """Calculates the average fitness score of each agent after several runs"""
 
-        fitness_scores = []
-        for agent in self.agents:
-            fitness_scores_ = []
-            for _ in range(self.runs):
-                fitness_scores_.append(self.interact(agent, self.env, self.params))
-            fitness_scores.append(sum(fitness_scores_) / self.runs)
-        return fitness_scores
+        return [self.fitness_test(agent, self.gym, self.interact, self.runs, self.params) for agent in self.agents]
+    
+    def calculate_fitness_parallel(self, ray):
+        """Calculates the average fitness score of each agent after several runs in parallel"""
+        
+        return ray.get([self.fitness_test.remote(self, agent, self.gym, self.interact, self.runs, self.params) for agent in self.agents])
 
     def mutate(self, agent):
         """Mutates the weights of the agent"""
@@ -94,8 +93,18 @@ class Evolution():
 
         self.agents = self.generate_random_agents()
 
+        if os.name != 'nt':
+            import ray
+            ray.init()
+        else:
+            env = gym.make(self.gym)
+
         for generation in range(self.generations):
-            fitness_scores = self.calculate_fitness() 
+            if os.name != 'nt':
+                fitness_scores = self.calculate_fitness_parallel(ray)
+            else:
+                fitness_scores = self.calculate_fitness()
+
             if self.top_parents < len(fitness_scores):
                 top_agents_idxs = sorted(range(len(fitness_scores)), key = lambda sub: fitness_scores[sub])[-self.top_parents : ] 
             else: 
@@ -107,43 +116,13 @@ class Evolution():
 
             # kill all agents, and replace them with their children
             self.agents = self.reproduce(top_agents_idxs)
+            
 
-class Simple_Asexual_Evolution(Evolution):
-    """Evolution strategy for Car Racing Environment"""
-
-    def reproduce(self, top_agents_idxs):
-        """Simple Asexual reproduction where you mutate the parents genes without mixing"""
-        
-        elite_index = top_agents_idxs[0]
-
-        child_agents = []
-
-        # first take selected parents from sorted_parent_indexes and generate N-1 children
-        for i in range(self.num_agents - 1):
-            agent_idx = top_agents_idxs[np.random.randint(len(top_agents_idxs))]
-            child_agents.append(self.mutate(self.agents[agent_idx]))
-
-        # add elite agent
-        child_agents.append(self.agents[elite_index])
-
-        return child_agents
-
-class Elite_Evolution(Evolution):
-    """Evolution strategy for Car Racing Environment"""
-
-    def reproduce(self, top_agents_idxs):
-        """Mutate the genes of the elite only"""
-        
-        elite_index = top_agents_idxs[0]
-
-        child_agents = []
-
-        # first take selected parents from sorted_parent_indexes and generate N-1 children
-        for i in range(self.num_agents - 1):
-            agent_idx = top_agents_idxs[np.random.randint(len(top_agents_idxs))]
-            child_agents.append(self.mutate(self.agents[elite_index]))
-
-        # add elite agent
-        child_agents.append(self.agents[elite_index])
-
-        return child_agents
+    @ray.remote
+    def fitness_test(self, agent, gym_, interact, runs, params):
+        """Runs a fitness test for an agent"""
+        env = gym.make(gym_)
+        fitness_scores_ = []
+        for _ in range(runs):
+            fitness_scores_.append(interact(agent, env, params))
+        return sum(fitness_scores_) / runs

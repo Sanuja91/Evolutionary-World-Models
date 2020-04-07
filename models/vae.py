@@ -6,6 +6,7 @@ from torchvision import datasets, transforms
 from torch.distributions.distribution import Distribution
 import matplotlib.pyplot as plt
 from models.base import Neural_Network
+from utilities import create_path
 
 class Conv(nn.Module):
     """Simlifed NN for ease of code"""
@@ -194,16 +195,16 @@ def train_vae(vae, epochs, log_interval):
                     len(train_loader.dataset),
                     100. * batch_idx / len(train_loader),
                     loss.item() / len(inputs)))
-                path = f'data\\outputs\\{vae.type}\\{vae.name}'
+                path = create_path(f'data\\outputs\\{vae.type}\\{vae.name}')
                 if not os.path.exists(path):
                     os.makedirs(path)
                 sample_input = inputs[0].squeeze(0).detach().cpu()
                 sample_output = outputs[0].squeeze(0).detach().cpu()
                 
                 sample_input = transforms.ToPILImage(mode='RGB')(sample_input)
-                sample_input.save(f'{path}\\E - {epoch} B - {batch_idx} target.png',"PNG")
+                sample_input.save(create_path(f'{path}\\E - {epoch} B - {batch_idx} target.png',"PNG"))
                 sample_output = transforms.ToPILImage(mode='RGB')(sample_output)
-                sample_output.save(f'{path}\\E - {epoch} B - {batch_idx} output.png',"PNG")
+                sample_output.save(create_path(f'{path}\\E - {epoch} B - {batch_idx} output.png',"PNG"))
                 
         print('====> Epoch: {} Average loss: {:.4f}'.format(epoch, train_loss / len(train_loader.dataset)))
     vae.save_model()

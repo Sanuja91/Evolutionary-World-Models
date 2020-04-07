@@ -1,4 +1,4 @@
-import gym, torch, cv2, os, time
+import gym, torch, cv2, os, time, concurrent
 import numpy as np
 from pyglet.window import key
 import matplotlib.pyplot as plt
@@ -7,7 +7,7 @@ from torchvision import datasets, transforms
 from models.vae import CNN_VAE, train_vae
 from models.mdn import MDN_RNN, train_mdn
 from models.controller import Controller
-from evolve.base import Simple_Asexual_Evolution, Elite_Evolution
+from evolve.simple import Simple_Asexual_Evolution, Elite_Evolution, Natural_Evolution
 from utilities import one_hot_encode_actions
 
 Z_SIZE = 128
@@ -152,7 +152,6 @@ def train_controller_(name, vae_name, mdn_name):
         'batch_norm' : True
     }
 
-    env = gym.make('CarRacing-v0')
     vae = CNN_VAE(vae_name, None, 'Latest')
     mdn = MDN_RNN(mdn_name, None, 'Latest')
     controller = Controller(name, params, False)  
@@ -161,18 +160,20 @@ def train_controller_(name, vae_name, mdn_name):
     controller.to(controller.device)
 
     params = {
-        'render': True,
+        'render': False,
+        'gym': 'CarRacing-v0',
         'num_agents' : 10, # number of random agents to create
         'runs' : 1, # number of runs to evaluate fitness score
         'timesteps': 1000, # timesteps to run in environment to get cumulative reward.. Random actions till LSTM starts working
         'top_parents' : 3, # number of parents from agents
         'generations' : 1000, # run evolution for X generations
         'mutation_power' : 0.2, # strength of mutation, set from https://arxiv.org/pdf/1712.06567.pdf
+        'gene_splits': [0.5, 0.7, 0.8],
         'vae' : vae,
         'mdn' : mdn
     }
 
-    evolution = Simple_Asexual_Evolution(env, controller, interact, params)
+    evolution = Natural_Evolution(controller, interact, params)
 
     evolution.evolve()
 
@@ -195,6 +196,7 @@ def interact(agent, env, params):
     cumulative_rewards = 0
     s = 0
     za = None
+    
     for timestep in range(timesteps):
         if render:
             env.render()
@@ -203,7 +205,7 @@ def interact(agent, env, params):
         
         mu, logvar = vae.encode(observation)
         z = vae.reparameterize(mu, logvar).squeeze(-1)
-        action_probabilities = agent(z, hidden[0].squeeze(0)).squeeze(0).cpu().numpy()
+        action_probabilities = agent(z, hidden[0].squeeze(0)).squeeze(0).detach().cpu().numpy()
 
         action_idx = np.random.choice(list(ENCODED_ACTIONS.keys()), 1, p = action_probabilities)[0]
         encoded_action = torch.tensor(ENCODED_ACTIONS[action_idx]).float().to(agent.device).unsqueeze(0)
@@ -235,3 +237,24 @@ def interact(agent, env, params):
 # create_mdn_training_data('Alpha - BN SMALL')
 # train_mdn_('Alpha - TEST')
 train_controller_('Alpha - TEST', 'Alpha - BN SMALL', 'Alpha - TEST')
+
+# import ray
+# def create_env():
+#     return gym.make('CarRacing-v0')
+
+# @ray.remote
+# def run_env(id, steps):
+#     env = gym.make('CarRacing-v0')
+#     env.reset()
+#     for step in range(steps):
+#         action = env.action_space.sample()
+#         env.step(action)
+#         print(f'ENV {id} STEP {step}')
+#     return id
+
+
+# ray.init()
+# results = []
+# for id in range(20):
+#     results.append(run_env.remote(id, 1000))
+# ray.get(results)

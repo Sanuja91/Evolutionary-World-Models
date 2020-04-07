@@ -7,6 +7,7 @@ from torch.distributions.distribution import Distribution
 from torch.nn.utils import clip_grad_norm_
 import matplotlib.pyplot as plt
 from models.base import Neural_Network
+from utilities import create_path
 
 class MDN_RNN(Neural_Network):
     """A Mixed Density Network using an LSTM Core"""
@@ -87,8 +88,8 @@ def train_mdn(mdn, epochs, log_interval):
     mdn.train()
     mdn = mdn.to(mdn.device)
     optimizer = optim.Adam(mdn.parameters(), lr = mdn.learning_rate)
-    z = torch.load('data\\inputs\\tensors\\zs.pt').float()
-    actions = torch.load('data\\inputs\\tensors\\actions.pt').float()
+    z = torch.load(create_path('data\\inputs\\tensors\\zs.pt')).float()
+    actions = torch.load(create_path('data\\inputs\\tensors\\actions.pt')).float()
     z = torch.cat((z, actions), dim = 1).unsqueeze(0)    
     
     # Creates batches
