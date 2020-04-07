@@ -4,6 +4,7 @@ import numpy as np
 from abc import ABCMeta, abstractmethod
 from time import time
 from copy import deepcopy
+from random import random
 import ray, gym
 
 class Evolution():
@@ -31,6 +32,7 @@ class Evolution():
         self.top_parents = params['top_parents']
         self.generations = params['generations']
         self.mutation_power = params['mutation_power']
+        self.mutation_chance = params['mutation_chance']
         self.parallel = params['parallel']
         
 
@@ -59,7 +61,7 @@ class Evolution():
     def calculate_fitness_parallel(self, ray):
         """Calculates the average fitness score of each agent after several runs in parallel"""
         
-        return ray.get([self.fitness_test.remote(self, agent, self.gym, self.interact, self.runs, self.params) for agent in self.agents])
+        return ray.get([self.fitness_test_parallel.remote(self, agent, self.gym, self.interact, self.runs, self.params) for agent in self.agents])
 
     def mutate(self, agent):
         """Mutates the weights of the agent"""
@@ -71,16 +73,19 @@ class Evolution():
                     for i1 in range(param.shape[1]):
                         for i2 in range(param.shape[2]):
                             for i3 in range(param.shape[3]):
-                                param[i0][i1][i2][i3] += self.mutation_power * np.random.randn()
+                                if random() <= self.mutation_chance:
+                                    param[i0][i1][i2][i3] += self.mutation_power * np.random.randn()
 
             elif len(param.shape) == 2: # weights of Linear layer
                 for i0 in range(param.shape[0]):
                     for i1 in range(param.shape[1]):
-                        param[i0][i1] += self.mutation_power * np.random.randn()
+                        if random() <= self.mutation_chance:
+                            param[i0][i1] += self.mutation_power * np.random.randn()
 
             elif len(param.shape) == 1: # biases of linear layer or conv layer
                 for i0 in range(param.shape[0]):
-                    param[i0] += self.mutation_power * np.random.randn()
+                    if random() <= self.mutation_chance:
+                        param[i0] += self.mutation_power * np.random.randn()
             
             else:
                 raise Exception('Mutation failed for layer! Layer type does not exist')
@@ -117,11 +122,18 @@ class Evolution():
             print(f'Top {self.top_parents} Scores {top_fitness_scores}')
 
             # kill all agents, and replace them with their children
-            self.agents = self.reproduce(top_agents_idxs)
-            
+            self.agents = self.reproduce(top_agents_idxs, top_fitness_scores)
+  
+    def fitness_test(self, agent, gym_, interact, runs, params):
+        """Runs a fitness test for an agent"""
+        env = gym.make(gym_)
+        fitness_scores_ = []
+        for _ in range(runs):
+            fitness_scores_.append(interact(agent, env, params))
+        return sum(fitness_scores_) / runs          
 
     @ray.remote
-    def fitness_test(self, agent, gym_, interact, runs, params):
+    def fitness_test_parallel(self, agent, gym_, interact, runs, params):
         """Runs a fitness test for an agent"""
         env = gym.make(gym_)
         fitness_scores_ = []

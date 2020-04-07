@@ -160,15 +160,16 @@ def train_controller_(name, vae_name, mdn_name):
     controller.to(controller.device)
 
     params = {
-        'render': False,
-        'parallel': False,
+        'render': True,
+        'parallel': True,
         'gym': 'CarRacing-v0',
-        'num_agents' : 10, # number of random agents to create
-        'runs' : 1, # number of runs to evaluate fitness score
-        'timesteps': 1000, # timesteps to run in environment to get cumulative reward.. Random actions till LSTM starts working
-        'top_parents' : 3, # number of parents from agents
+        'num_agents' : 20, # number of random agents to create
+        'runs' : 2, # number of runs to evaluate fitness score
+        'timesteps': 500, # timesteps to run in environment to get cumulative reward.. Random actions till LSTM starts working
+        'top_parents' : 4, # number of parents from agents
         'generations' : 1000, # run evolution for X generations
         'mutation_power' : 0.2, # strength of mutation, set from https://arxiv.org/pdf/1712.06567.pdf
+        'mutation_chance' : 0.2, # chance of mutation,
         'gene_splits': [0.5, 0.7, 0.8],
         'vae' : vae,
         'mdn' : mdn
